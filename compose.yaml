@@ -1,0 +1,9 @@
+services:
+  postgres:
+    image: "postgres:18-alpine"
+    environment:
+      - "POSTGRES_DB=bts"
+      - "POSTGRES_PASSWORD=root"
+      - "POSTGRES_USER=root"
+    ports:
+      - "5432"
