@@ -1,7 +1,9 @@
 package com.bts.task.service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -14,8 +16,10 @@ import com.bts.task.dto.common.PageResponse;
 import com.bts.task.dto.product.ProductRequest;
 import com.bts.task.dto.product.ProductResponse;
 import com.bts.task.exception.NotFoundException;
+import com.bts.task.model.Image;
 import com.bts.task.model.Product;
 import com.bts.task.model.User;
+import com.bts.task.repository.ImageRepository;
 import com.bts.task.repository.ProductRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -25,6 +29,9 @@ import lombok.RequiredArgsConstructor;
 public class ProductService {
   @Autowired
   private final ProductRepository productRepository;
+
+  @Autowired
+  private final ImageRepository imageRepository;
 
   public PageResponse<ProductResponse> search(String keyword, String category, int page, int limit) {
     Pageable pageable = PageRequest.of(page, limit);
@@ -53,7 +60,10 @@ public class ProductService {
     product.setCreatedAt(now);
     product.setUpdatedAt(now);
 
-    return toResponse(productRepository.save(product));
+    product = productRepository.save(product);
+    saveImages(product.getId(), req.images(), now);
+
+    return toResponse(product);
   }
 
   @Transactional()
@@ -68,12 +78,35 @@ public class ProductService {
     product.setUpdatedById(user.getId());
     product.setUpdatedAt(Instant.now());
 
-    return toResponse(productRepository.save(product));
+    product = productRepository.save(product);
+    imageRepository.deleteAll(imageRepository.findAllByImageableId(product.getId()));
+    saveImages(product.getId(), req.images(), Instant.now());
+
+    return toResponse(product);
   }
 
   @Transactional()
   public void delete(UUID id) {
-    productRepository.delete(findOrThrow(id));
+    Product product = findOrThrow(id);
+    imageRepository.deleteAll(imageRepository.findAllByImageableId(product.getId()));
+    productRepository.delete(product);
+  }
+
+  private void saveImages(UUID imageableId, List<String> urls, Instant now) {
+    if (urls == null || urls.isEmpty()) {
+      return;
+    }
+    List<Image> images = urls.stream()
+        .map(url -> {
+          Image img = new Image();
+          img.setImageableId(imageableId);
+          img.setUrl(url);
+          img.setCreatedAt(now);
+          img.setUpdatedAt(now);
+          return img;
+        })
+        .collect(Collectors.toList());
+    imageRepository.saveAll(images);
   }
 
   private Product findOrThrow(UUID id) {
@@ -82,6 +115,11 @@ public class ProductService {
   }
 
   private ProductResponse toResponse(Product product) {
+    List<String> images = imageRepository.findAllByImageableId(product.getId())
+        .stream()
+        .map(img -> img.getUrl())
+        .collect(Collectors.toList());
+
     return new ProductResponse(
         product.getId(),
         product.getTitle(),
@@ -90,6 +128,7 @@ public class ProductService {
         product.getCategory(),
         product.getCreatedBy(),
         product.getCreatedAt(),
-        product.getUpdatedAt());
+        product.getUpdatedAt(),
+        images);
   }
 }

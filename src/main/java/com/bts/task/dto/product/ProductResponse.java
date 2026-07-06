@@ -2,6 +2,7 @@ package com.bts.task.dto.product;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public record ProductResponse(
@@ -12,5 +13,6 @@ public record ProductResponse(
     String category,
     String createdBy,
     Instant createdAt,
-    Instant updatedAt) {
+    Instant updatedAt,
+    List<String> images) {
 }
